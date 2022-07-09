@@ -11,64 +11,117 @@
 
 <body>
     <script>
-        let channel = null
+        let dataChannel = null
+        let telemetryChannel = null
         let keySuite;
         let keySuiteOtherParty;
-        let shake1, shake2;
+
+        let rtcConfig = {
+            bundlePolicy: "max-bundle",
+            iceServers: [
+                { urls: 'stun:stun3.l.google.com:19305' }
+            ],
+            certificates: []
+        };
+        let connection;
 
         window.onload = async function () {
+            // Generate keySuite (ECDSA and ECDH keypairs)
             keySuite = await genKeySuite();
-        };
+            let publicKeys = {
+                ECDH: await window.crypto.subtle.exportKey("jwk", keySuite.ECDH.publicKey),
+                ECDSA: await window.crypto.subtle.exportKey("jwk", keySuite.ECDSA.publicKey)
+            }
+            console.log("Public keys", publicKeys)
+            // Poll working STUN servers
+            // Thanks for this currated list to https://github.com/pradt2
+            // https://github.com/pradt2/always-online-stun
+            const resp = await fetch('https://raw.githubusercontent.com/pradt2/always-online-stun/master/valid_ipv4s.txt');
+            if (resp.status == 200) {
+                const rawList = await resp.text();
+                const list = rawList.split("\n");
+                let liveServers = []
+                for (let i = 0; i < 20; i++) {
+                    let server = {
+                        urls: 'stun:' + list[i]
+                    }
+                    liveServers.push(server)
+                }
+                rtcConfig.iceServers = liveServers
+            } else {
+                console.log("Working STUN servers poll failed, fallback to Google!")
+            }
 
-        const rtcConfig = {
-            bundlePolicy: "max-bundle",
-            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-        };
+            let cert = await RTCPeerConnection.generateCertificate({
+                name: "ECDSA",
+                namedCurve: "P-256"
+            })
+            rtcConfig.certificates.push(cert)
 
-        const connection = new RTCPeerConnection(rtcConfig);
+            connection = new RTCPeerConnection(rtcConfig);
 
-        connection.ondatachannel = async (event) => {
-            channel = event.channel
-            channel.onmessage = event => handeMessages(event)
-        }
+            connection.onconnectionstatechange = (event) => (document.getElementById('connectionState').innerText = connection.connectionState)
+            connection.oniceconnectionstatechange = (event) => (document.getElementById('iceConnectionState').innerText = connection.iceConnectionState)
 
-        connection.onconnectionstatechange = (event) => (document.getElementById('connectionState').innerText = connection.connectionState) // console.log('onconnectionstatechange', connection.connectionState)
-        connection.oniceconnectionstatechange = (event) =>
-            (document.getElementById('iceConnectionState').innerText = connection.iceConnectionState) // console.log('oniceconnectionstatechange', connection.iceConnectionState)
+            dataChannel = connection.createDataChannel('data')
+            telemetryChannel = connection.createDataChannel('telemetry')
 
-        async function handeMessages(event) {
+            dataChannel.onopen = async (event) => {
                 document.getElementById('message').disabled = false;
                 document.getElementById('sendMessage').disabled = false;
-                let payload = JSON.parse(event.data)
-                console.log("Arrived Payload", payload)
+            }
 
-                if (!payload.hasOwnProperty('msg') && !payload.hasOwnProperty('sign')) {
-                    return alert("Unencrypted message arrived")
+            dataChannel.onmessage = event => messageHandler(event)
+
+            telemetryChannel.onopen = async (event) => {
+                document.getElementById('message').disabled = false;
+                document.getElementById('sendMessage').disabled = false;
+                telemetryChannel.send(await enc("ping"))
+            }
+
+            telemetryChannel.onmessage = event => telemetryHandler(event)
+
+            connection.ondatachannel = (event) => {
+                switch (event.channel.label) {
+                    case "telemetry":
+                        event.channel.onmessage = (ev) => telemetryHandler(ev)
+                        break;
+
+                    case "data":
+                        event.channel.onmessage = (ev) => messageHandler(ev)
+                        break;
                 }
 
-                if (payload.hasOwnProperty('shake1')) {
-                    console.log("shake1")
+            }
+        };
 
-                    const result = await verify(payload.msg, payload.sign, keySuiteOtherParty.ECDSA);
-                    if (!result) {
-                        console.log("Shake1: Sign correct!");
-                        document.getElementById('iceConnectionState').innerText = "!!! UNSECURE !!!";
-                    }
+        async function telemetryHandler(event) {
+            const payload = JSON.parse(event.data)
 
-                    shake1 = await msgDecryptBasedECDH(payload.msg, keySuite.ECDH.privateKey, keySuiteOtherParty.ECDH);
-                    console.log("Shake1 Plaintext: ", shake1);
+            if (!payload.hasOwnProperty('msg') && !payload.hasOwnProperty('sign')) {
+                return alert("Unencrypted or uncorrect message arrived!!!")
+            }
+            const plaintext = await dec(payload);
+            switch (plaintext) {
+                case "ping":
+                    console.log("ping")
+                    telemetryChannel.send(await enc("pong"));
+                    break;
+                case "pong":
+                    console.log("pong")
+                    break;
+                default:
+                    break;
+            }
+        }
 
-                    shake2 = buf2Hex(window.crypto.getRandomValues(new Uint32Array(32)));
-
-                    let payload = await msgEncryptAndSign(shake2, keySuite.ECDH.privateKey, keySuiteOtherParty.ECDH, keySuite.ECDSA.privateKey)
-                    payload.shake2 = true
-                    return channel.send(JSON.stringify(payload))
-                } else if (payload.hasOwnProperty('shake2')){
-
-                } else {
-                    const plaintext = await msgDecryptBasedECDH(payload.msg, keySuite.ECDH.privateKey, keySuiteOtherParty.ECDH);
-                    return alert(plaintext);
-                }
+        async function messageHandler(event) {
+            const payload = JSON.parse(event.data)
+            if (!payload.hasOwnProperty('msg') && !payload.hasOwnProperty('sign')) {
+                return alert("Unencrypted or uncorrect message arrived!!!")
+            }
+            const plaintext = await dec(payload);
+            return alert(plaintext);
         }
 
         async function createInvite() {
@@ -78,21 +131,7 @@
             document.getElementById('remoteAnswerInvite').disabled = false
             document.getElementById('acceptAnswerInvite').disabled = false
 
-            channel = connection.createDataChannel('data')
-            channel.onopen = async (event) => {
-                document.getElementById('message').disabled = false;
-                document.getElementById('sendMessage').disabled = false;
-                console.log("Handshake send from inviter");
-                //shake1 = buf2hex(window.crypto.getRandomValues(new Uint32Array(32)));
-                //let payload = await msgEncryptAndSign(shake1, keySuite.ECDH.privateKey, keySuiteOtherParty.ECDH, keySuite.ECDSA.privateKey)
-                //payload.shake1 = true
-                //channel.send(JSON.stringify(payload))
-            }
-            channel.onmessage = event => console.log('onmessage', event)
-            channel.onmessage  = event => handeMessages(event)
-
             connection.onicecandidate = async (event) => {
-                // console.log('onicecandidate', event)
                 if (!event.candidate) {
                     const invite = {
                         ECDH: await window.crypto.subtle.exportKey("jwk", keySuite.ECDH.publicKey),
@@ -102,7 +141,6 @@
 
                     document.getElementById('createInviteText').value = btoa(JSON.stringify(invite))
                     document.getElementById('createInviteText').hidden = false
-
                 }
             }
 
@@ -110,14 +148,16 @@
             await connection.setLocalDescription(offer);
         }
 
-        async function step_2_accept_remote_offer() {
+        async function acceptInvite() {
             document.getElementById('createInvite').disabled = true;
 
             const inviteCode = JSON.parse(atob(document.getElementById('remoteInvite').value))
             keySuiteOtherParty = {
                 ECDH: await window.crypto.subtle.importKey("jwk", inviteCode.ECDH, { name: "ECDH", namedCurve: "P-256" }, true, []),
-                ECDSA: await window.crypto.subtle.importKey("jwk", inviteCode.ECDSA, { name: "ECDSA", namedCurve: "P-256" }, true, [])
+                ECDSA: await window.crypto.subtle.importKey("jwk", inviteCode.ECDSA, { name: "ECDSA", namedCurve: "P-256" }, true, ["verify"])
             }
+
+            console.log("Other party public keys: ", { ECDH: inviteCode.ECDH, ECDSA: inviteCode.ECDSA })
             await connection.setRemoteDescription(inviteCode.SDP)
 
             connection.onicecandidate = async (event) => {
@@ -139,7 +179,7 @@
             await connection.setLocalDescription(answer)
         }
 
-        async function step_4_accept_answer() {
+        async function acceptAnswer() {
             document.getElementById('createInvite').disabled = true
             document.getElementById('createInvite').disabled = true
             document.getElementById('remoteAnswerInvite').disabled = true
@@ -147,15 +187,31 @@
             const answer = JSON.parse(atob(document.getElementById('remoteAnswerInvite').value))
             keySuiteOtherParty = {
                 ECDH: await window.crypto.subtle.importKey("jwk", answer.ECDH, { name: "ECDH", namedCurve: "P-256" }, true, []),
-                ECDSA: await window.crypto.subtle.importKey("jwk", answer.ECDSA, { name: "ECDSA", namedCurve: "P-256" }, true, []),
+                ECDSA: await window.crypto.subtle.importKey("jwk", answer.ECDSA, { name: "ECDSA", namedCurve: "P-256" }, true, ["verify"]),
             }
+            console.log("Other party public keys: ", { ECDH: answer.ECDH, ECDSA: answer.ECDSA })
             await connection.setRemoteDescription(answer.SDP)
 
         }
 
         async function send() {
-            const plaintext = document.getElementById('message').value
-            channel.send(JSON.stringify(await msgEncryptAndSign(plaintext, keySuite.ECDH.privateKey, keySuiteOtherParty.ECDH, keySuite.ECDSA.privateKey)))
+            const msg = await enc(document.getElementById('message').value);
+            dataChannel.send(msg)
+        }
+
+        async function dec(payload) {
+            let plaintext;
+            try {
+                plaintext = await msgDecryptAndVerify(payload, keySuite.ECDH.privateKey, keySuiteOtherParty.ECDH, keySuiteOtherParty.ECDSA);
+            } catch (e) {
+                console.log("Error: ", e)
+                return
+            }
+            return plaintext;
+        }
+
+        async function enc(plaintext) {
+            return JSON.stringify(await msgEncryptAndSign(plaintext, keySuite.ECDH.privateKey, keySuiteOtherParty.ECDH, keySuite.ECDSA.privateKey))
         }
 
     </script>
@@ -165,11 +221,11 @@
         <input id="createInviteText" type="text" hidden />
         <hr />
         <input id="remoteInvite" type="text" placeholder="Invite acception code" />
-        <input type="button" value="Accept invite" id="acceptOffer" onclick="step_2_accept_remote_offer()" />
+        <input type="button" value="Accept invite" id="acceptOffer" onclick="acceptInvite()" />
         <input id="createdAnswerInvite" type="text" hidden />
         <hr />
         <input id="remoteAnswerInvite" type="text" placeholder="Accept answer" disabled />
-        <input id="acceptAnswerInvite" type="button" value="Accept answer" onclick="step_4_accept_answer()" />
+        <input id="acceptAnswerInvite" type="button" value="Accept answer" onclick="acceptAnswer()" />
         <hr />
         <input id="sendMessage" type="button" value="Send" onclick="send()" disabled />
         <input id="message" type="text" placeholder="Message" disabled />

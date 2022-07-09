@@ -5,6 +5,7 @@
 - [ ] Better UI
 - [ ] File sending
 - [ ] Session self-destruct
-- [ ] Multi-party join
+- [ ] Multi peer join
 - [ ] Keepalive check
 - [ ] NIZK base P-256
+- [ ] Better init ceremony

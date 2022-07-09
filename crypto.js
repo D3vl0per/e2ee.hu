@@ -4,12 +4,12 @@ async function msgEncryptAndSign(msg, privateKey, publicKey, privateKeyECDH){
     return { msg: ciphertext, sig}
 }
 
-async function msgDecryptAndVerify(payload, privateKey, publicKey){
-    const result = await verify(payload.msg, payload.sig, publicKey);
+async function msgDecryptAndVerify(payload, privateKeyECDH, publicKeyECDH, publicKeyECDSA){
+    const result = await verify(payload.msg, payload.sig, publicKeyECDSA);
     if (!result){
-        return new Error('Verification failed')
+        return new Error('Verification failed');
     }
-    let plaintext = await msgDecryptBasedECDH(payload.msg, privateKey, publicKey);
+    let plaintext = await msgDecryptBasedECDH(payload.msg, privateKeyECDH, publicKeyECDH);
     return plaintext;
 }
 
@@ -55,7 +55,7 @@ async function genKeySuite() {
     return { ECDH: ecdh, ECDSA: ecdsa }
 }
 
-async function sign(text, privateKey){
+async function sign(msg, privateKey){
     let enc = new TextEncoder();
     let signature = await window.crypto.subtle.sign(
         {
@@ -63,7 +63,7 @@ async function sign(text, privateKey){
             hash: { name: "SHA-512" },
         },
         privateKey,
-        enc.encode(text)
+        enc.encode(msg)
     );
     return buf2hex(signature)
 }
