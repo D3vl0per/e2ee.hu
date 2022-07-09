@@ -81,7 +81,11 @@
 
             telemetryChannel.onmessage = event => telemetryHandler(event)
 
-            connection.ondatachannel = (event) => {
+            connection.ondatachannel = async (event) => {
+                const fp = await fingerprint(keySuite, keySuiteOtherParty);
+                document.getElementById('fingerprint').innerText = fp;
+                document.getElementById('pgpWords').innerText = await PGPWords(fp);
+
                 switch (event.channel.label) {
                     case "telemetry":
                         event.channel.onmessage = (ev) => telemetryHandler(ev)
@@ -101,9 +105,11 @@
             if (!payload.hasOwnProperty('msg') && !payload.hasOwnProperty('sign')) {
                 return alert("Unencrypted or uncorrect message arrived!!!")
             }
+
             const plaintext = await dec(payload);
             switch (plaintext) {
                 case "ping":
+
                     console.log("ping")
                     telemetryChannel.send(await enc("pong"));
                     break;
@@ -191,7 +197,6 @@
             }
             console.log("Other party public keys: ", { ECDH: answer.ECDH, ECDSA: answer.ECDSA })
             await connection.setRemoteDescription(answer.SDP)
-
         }
 
         async function send() {
@@ -229,8 +234,8 @@
         <hr />
         <input id="sendMessage" type="button" value="Send" onclick="send()" disabled />
         <input id="message" type="text" placeholder="Message" disabled />
-        <hr />
     </table>
+    <hr />
     <table border="1">
         <tr>
             <th colspan="2">connection</th>
@@ -248,6 +253,20 @@
             <td id="iceConnectionState">unknown</td>
         </tr>
     </table>
+    <table border="1">
+        <tr>
+            <th colspan="2">Shared Fingerprint</th>
+        </tr>
+        <tr>
+            <th>Fingerprint</th>
+            <td id="fingerprint">unknown</td>
+        </tr>
+        <tr>
+            <th>PGP Words</th>
+            <td id="pgpWords">unknown</td>
+        </tr>
+    </table>
+
     <hr />
     <a href="https://github.com/D3vl0per/e2ee.hu">https://github.com/D3vl0per/e2ee.hu</a>
 </body>
