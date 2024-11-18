@@ -165,12 +165,12 @@ async function wrapKey(format, keyToWrap, password) {
 
 }
 
-function PGPWords(fingerprint){
+function PGPWords(fingerprint) {
     let words = "";
     let j = 0;
-    for (let i = 0; i < fingerprint.length-1; i+=2) {
-        const hex = fingerprint[i].concat(fingerprint[i+1]);
-        words += `${raw_words[hex][j%2]} `;
+    for (let i = 0; i < fingerprint.length - 1; i += 2) {
+        const hex = fingerprint[i].concat(fingerprint[i + 1]);
+        words += `${raw_words[hex][j % 2]} `;
         j++;
     }
 
