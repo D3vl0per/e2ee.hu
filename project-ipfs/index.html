@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="crypto.js"></script>
+    <title>Mail</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #121212;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+            visibility: hidden;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #1e1e1e;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+            margin: 10px;
+        }
+
+        form label {
+            margin-bottom: 10px;
+            font-size: 1.2em;
+            color: #ffffff;
+        }
+
+        form input {
+            margin-bottom: 20px;
+            padding: 10px;
+            width: 100%;
+            border: 1px solid #333333;
+            border-radius: 5px;
+            font-size: 1em;
+            background-color: #333333;
+            color: #ffffff;
+        }
+
+        form select {
+            margin-bottom: 20px;
+            padding: 10px;
+            width: 100%;
+            border: 1px solid #333333;
+            border-radius: 5px;
+            font-size: 1em;
+            background-color: #333333;
+            color: #ffffff;
+        }
+
+        form button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: #ffffff;
+            border: none;
+            border-radius: 5px;
+            font-size: 1em;
+            cursor: pointer;
+        }
+
+        form button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+
+<body>
+    <form id="encryptFrom">
+        <label for="iterations">Iterations:</label>
+        <input type="text" id="encryptIterations" name="iterations" value="100000">
+        <label for="hashes">Hashes:</label>
+        <select id="encryptHashes" name="hashes">
+            <option value="SHA-256">SHA-256</option>
+            <option value="SHA-384">SHA-384</option>
+            <option value="SHA-512">SHA-512</option>
+            <option value="SHA-1">LOL SHA-1 LOL</option>
+        </select>
+        <label for="plaintext">Plaintext:</label>
+        <input type="text" id="plaintext" name="plaintext">
+        <label for="password">Password (KEK):</label>
+        <input type="password" id="encryptPassword" name="password">
+        <button type="button" id="encryptButton">Encrypt</button>
+    </form>
+
+    <form id="decryptForm">
+        <label for="iterations">Iterations:</label>
+        <input type="text" id="decryptIterations" name="iterations" value="100000">
+        <label for="hashes">Hashes:</label>
+        <select id="decryptHashes" name="hashes">
+            <option value="SHA-256">SHA-256</option>
+            <option value="SHA-384">SHA-384</option>
+            <option value="SHA-512">SHA-512</option>
+            <option value="SHA-1">LOL SHA-1 LOL</option>
+        </select>
+        <label for="ciphertext">Ciphertext:</label>
+        <input type="text" id="ciphertext" name="ciphertext">
+        <label for="dek">Encrypted DEK:</label>
+        <input type="text" id="dek" name="dek">
+        <label for="password">Password (KEK):</label>
+        <input type="password" id="decryptPassword" name="password">
+        <label for="decryptedPlaintext">Decrypted Plaintext:</label>
+        <input type="text" id="decryptedPlaintext" name="decryptedPlaintext" disabled>
+        <button type="button" id="decryptButton">Decrypt</button>
+    </form>
+
+    <form id="pbkdf2">
+        <label for="hashes">Hashes:</label>
+        <select id="iterationHashes" name="hashes">
+            <option value="SHA-256">SHA-256</option>
+            <option value="SHA-384">SHA-384</option>
+            <option value="SHA-512">SHA-512</option>
+            <option value="SHA-1">LOL SHA-1 LOL</option>
+        </select>
+        <label for="seconds">Seconds:</label>
+        <input type="text" id="seconds" name="seconds" value="1">
+        <label for="iterations">Iterations:</label>
+        <input type="text" id="iterations" name="iterations" disabled>
+        <button type="button" id="pbkdf2Button">Calculate iterations</button>
+    </form>
+
+    <script>
+        // Encrypt:
+        // 1. Get user supplied password
+        // 2. PBDKF2 to derive the KEK from the user supplied password  
+        // 3. Generate a random DEK (Data Encryption Key)
+        // 4. Encrypt (AES-GCM) the image with DEK
+        // 5. Encrypt (AES-GCM) DEK with KEK
+        // 6. Save the encrypted image and the encrypted DEK into the website
+
+        // Decrypt:
+        // 1. Get user supplied password
+        // 2. PBDKF2 to derive the KEK from the user supplied password
+        // 3. Decrypt (AES-GCM) DEK with KEK
+        // 4. Decrypt the encrypted image with DEK
+        // 5. Display the image
+
+        window.addEventListener('load', function() {
+            document.body.style.visibility = 'visible';
+        });
+
+        document.getElementById('encryptButton').addEventListener('click', async function () {
+            const plaintext = document.getElementById('plaintext').value;
+            const password = document.getElementById('encryptPassword').value;
+            const iterations = document.getElementById('encryptIterations').value;
+            const hash = document.getElementById('encryptHashes').value;
+            console.log('Password :', password);
+            console.log('Plaintext:', plaintext);
+            console.log('Iterations:', iterations);
+            console.log('Hash:', hash);
+
+            const key = await generateKey( {name: "AES-GCM",length: 256,}, true, ["encrypt"])
+            console.log('DEK:', key);
+
+            
+            const ciphertext = await encryptAESGCM(key, stringToArrayBuffer(plaintext))
+            console.log('Ciphertext:', ciphertext);
+            
+
+            const wrappedKey = await wrapKey('raw', key, password, iterations, hash)
+            console.log('Wrapped key (encrypted DEK):', wrappedKey);
+            
+            document.getElementById('ciphertext').value = ciphertext;
+            document.getElementById('dek').value = wrappedKey;
+            document.getElementById('decryptPassword').value = password;
+            document.getElementById('decryptIterations').value = iterations;
+            document.getElementById('decryptHashes').value = hash;
+        });
+
+        document.getElementById('decryptButton').addEventListener('click', async function () {
+            const ciphertext = document.getElementById('ciphertext').value;
+            const password = document.getElementById('decryptPassword').value;
+            const wrappedKey = document.getElementById('dek').value;
+            const iterations = document.getElementById('decryptIterations').value;
+            const hash = document.getElementById('decryptHashes').value;
+            console.log('Encrypted DEK:', wrappedKey);
+            console.log('Ciphertext:', ciphertext);
+            console.log('Password :', password);
+            console.log('Iterations:', iterations);
+            
+            const unwrappedKey = await unwrapKey('raw', wrappedKey, password, iterations, hash)
+            console.log('Unwrapped key (DEK):', unwrappedKey);
+
+            const plaintext = await decryptAESGCM(unwrappedKey, ciphertext);
+            console.log('Plaintext:', arrayBufferToString(plaintext));
+
+            document.getElementById('decryptedPlaintext').value =  arrayBufferToString(plaintext);
+        });
+
+        document.getElementById('pbkdf2Button').addEventListener('click', async function () {
+            const seconds = document.getElementById('seconds').value;
+            const iterations = await calculatePBKDF2Iterations(seconds);
+            const hash = document.getElementById('iterationHashes').value;
+            console.log('Iterations:', iterations);
+            document.getElementById('iterations').value = iterations;
+            document.getElementById('encryptIterations').value = iterations;
+            document.getElementById('decryptIterations').value = iterations;
+            document.getElementById('encryptHashes').value = hash;
+            document.getElementById('decryptHashes').value = hash;
+        });
+
+    </script>
+
+</body>
+
+</html>
