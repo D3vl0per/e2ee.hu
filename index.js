@@ -12,7 +12,16 @@ let rtcConfig = {
 };
 let connection;
 
+function resetFields() {
+    document.getElementById('createInviteText').value = '';
+    document.getElementById('remoteInvite').value = '';
+    document.getElementById('createdAnswerInvite').value = '';
+    document.getElementById('remoteAnswerInvite').value = '';
+}
+
 window.onload = async function () {
+    resetFields();
+
     // Generate keySuite (ECDSA and ECDH keypairs)
     keySuite = await genKeySuite();
     let publicKeys = {

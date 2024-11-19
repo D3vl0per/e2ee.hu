@@ -8,60 +8,135 @@
     <script src="index.js"></script>
     <script src="crypto.js"></script>
     <title>e2ee.hu</title>
+    <style>
+        body {
+            background-color: black;
+            color: rgb(255, 255, 255);
+            font-family: "Courier New", Courier, monospace;
+            margin: 0;
+            padding: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        th, td {
+            border: 1px solid green;
+            padding: 10px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #333;
+        }
+
+        input, textarea {
+            background-color: black;
+            color: rgb(24, 253, 24);
+            border: 1px solid green;
+            padding: 10px;
+            margin: 5px 0;
+            width: calc(100% - 22px);
+        }
+
+        input[type="button"] {
+            cursor: pointer;
+            width: auto;
+        }
+
+        a {
+            color: rgb(255, 255, 255);
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        hr {
+            border: 1px solid green;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .section {
+            margin-bottom: 20px;
+        }
+
+        .section-title {
+            font-size: 1.5em;
+            margin-bottom: 10px;
+        }
+        #chatBox {
+            color: white;
+        }
+    </style>
 </head>
-
 <body>
-    <table border="1">
+    <div class="container">
+        <div class="section">
+            <div class="section-title">Create Invite</div>
+            <input type="button" value="Create invite" id="createInvite" onclick="createInvite()" />
+            <input id="createInviteText" type="text" hidden />
+        </div>
         <hr />
-        <input type="button" value="Create invite" id="createInvite" onclick="createInvite()" />
-        <input id="createInviteText" type="text" hidden />
+        <div class="section">
+            <div class="section-title">Accept Invite</div>
+            <input id="remoteInvite" type="text" placeholder="Invite acception code" />
+            <input type="button" value="Accept invite" id="acceptOffer" onclick="acceptInvite()" />
+            <input id="createdAnswerInvite" type="text" hidden />
+            <hr />
+            <input id="remoteAnswerInvite" type="text" placeholder="Accept answer" disabled />
+            <input id="acceptAnswerInvite" type="button" value="Accept answer" onclick="acceptAnswer()" />
+        </div>
         <hr />
-        <input id="remoteInvite" type="text" placeholder="Invite acception code" />
-        <input type="button" value="Accept invite" id="acceptOffer" onclick="acceptInvite()" />
-        <input id="createdAnswerInvite" type="text" hidden />
+        <div class="section">
+            <div class="section-title">Chat</div>
+            <textarea id="chatBox" rows="20" cols="80" readonly></textarea>
+            <br>
+            <input id="sendMessage" type="button" value="Send" onclick="send()" disabled />
+            <input id="message" type="text" placeholder="Message" disabled />
+        </div>
         <hr />
-        <input id="remoteAnswerInvite" type="text" placeholder="Accept answer" disabled />
-        <input id="acceptAnswerInvite" type="button" value="Accept answer" onclick="acceptAnswer()" />
+        <div class="section">
+            <div class="section-title">Connection</div>
+            <table>
+                <tr>
+                    <th>Connection State</th>
+                    <td id="connectionState">unknown</td>
+                </tr>
+                <tr>
+                    <th>ICE Connection State</th>
+                    <td id="iceConnectionState">unknown</td>
+                </tr>
+                <tr>
+                    <th>E2EE</th>
+                    <td id="e2eeState">unknown</td>
+                </tr>
+            </table>
+        </div>
+        <div class="section">
+            <div class="section-title">Shared Fingerprint</div>
+            <table>
+                <tr>
+                    <th>Fingerprint</th>
+                    <td id="fingerprint">unknown</td>
+                </tr>
+                <tr>
+                    <th>PGP Words</th>
+                    <td id="pgpWords">unknown</td>
+                </tr>
+            </table>
+        </div>
         <hr />
-        <textarea id="chatBox" rows="20" cols="80" readonly></textarea>
-        <br>
-        <input id="sendMessage" type="button" value="Send" onclick="send()" disabled />
-        <input id="message" type="text" placeholder="Message" disabled />
-    </table>
-    <hr />
-    <table border="1">
-        <tr>
-            <th colspan="2">connection</th>
-        </tr>
-        <tr>
-            <th>connectionState</th>
-            <td id="connectionState">unknown</td>
-        </tr>
-        <tr>
-            <th>iceConnectionState</th>
-            <td id="iceConnectionState">unknown</td>
-        </tr>
-        <tr>
-            <th>E2EE</th>
-            <td id="iceConnectionState">unknown</td>
-        </tr>
-    </table>
-    <table border="1">
-        <tr>
-            <th colspan="2">Shared Fingerprint</th>
-        </tr>
-        <tr>
-            <th>Fingerprint</th>
-            <td id="fingerprint">unknown</td>
-        </tr>
-        <tr>
-            <th>PGP Words</th>
-            <td id="pgpWords">unknown</td>
-        </tr>
-    </table>
-
-    <hr />
-    <a href="https://github.com/D3vl0per/e2ee.hu">https://github.com/D3vl0per/e2ee.hu</a>
+        <a href="https://github.com/D3vl0per/e2ee.hu">https://github.com/D3vl0per/e2ee.hu</a>
+    </div>
 </body>
 
 </html>
