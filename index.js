@@ -37,7 +37,7 @@ window.onload = async function () {
         const rawList = await resp.text();
         const list = rawList.split("\n");
         let liveServers = []
-        for (let i = 0; i < 4; i++) {
+        for (let i = 0; i < 30; i++) {
             let server = {
                 urls: 'stun:' + list[i]
             }
