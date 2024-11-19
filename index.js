@@ -37,7 +37,7 @@ window.onload = async function () {
         const rawList = await resp.text();
         const list = rawList.split("\n");
         let liveServers = []
-        for (let i = 0; i < 30; i++) {
+        for (let i = 0; i < 10; i++) {
             let server = {
                 urls: 'stun:' + list[i]
             }
@@ -55,6 +55,8 @@ window.onload = async function () {
     rtcConfig.certificates.push(cert)
 
     connection = new RTCPeerConnection(rtcConfig);
+
+    connection.iceGatheringTimeout = 1000 * 60 * 5;
 
     connection.onconnectionstatechange = (event) => (document.getElementById('connectionState').innerText = connection.connectionState)
     connection.oniceconnectionstatechange = (event) => (document.getElementById('iceConnectionState').innerText = connection.iceConnectionState)
